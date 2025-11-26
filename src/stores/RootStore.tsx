@@ -40,6 +40,22 @@ export class RootStore {
     this.isProjectLoaded = true
   }
 
+  async createProject(projectName: string): Promise<boolean> {
+    try {
+      const boardJsonPath = await window.electronAPI.createProject(projectName)
+      if (!boardJsonPath) {
+        return false // User cancelled
+      }
+      
+      // Open the newly created project
+      await this.openProject(boardJsonPath)
+      return true
+    } catch (error) {
+      console.error('Failed to create project:', error)
+      throw error
+    }
+  }
+
   getAbsolutePath(relativePath: string): string {
     if (!this.projectRoot) return relativePath
     return `${this.projectRoot}/${relativePath}`
@@ -47,7 +63,9 @@ export class RootStore {
 
   getRelativePath(absolutePath: string): string {
     if (!this.projectRoot) return absolutePath
-    return absolutePath.replace(this.projectRoot + '/', '')
+    // Normalize backslashes to forward slashes for consistent comparison
+    const normalizedPath = absolutePath.replace(/\\/g, '/')
+    return normalizedPath.replace(this.projectRoot + '/', '')
   }
 }
 

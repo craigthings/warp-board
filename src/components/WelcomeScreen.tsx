@@ -7,6 +7,8 @@ export const WelcomeScreen = observer(() => {
   const rootStore = useRootStore()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [projectName, setProjectName] = useState('')
 
   const handleOpenProject = async () => {
     setIsLoading(true)
@@ -24,10 +26,45 @@ export const WelcomeScreen = observer(() => {
     }
   }
 
+  const handleShowCreateForm = () => {
+    setShowCreateForm(true)
+    setProjectName('')
+    setError(null)
+  }
+
+  const handleCancelCreate = () => {
+    setShowCreateForm(false)
+    setProjectName('')
+    setError(null)
+  }
+
   const handleCreateProject = async () => {
-    // For now, just create a demo project in the current directory
-    // In a real app, we'd show a save dialog
-    setError('Create project coming soon! For now, open an existing .board.json file.')
+    if (!projectName.trim()) {
+      setError('Please enter a project name')
+      return
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const success = await rootStore.createProject(projectName.trim())
+      if (!success) {
+        // User cancelled the save dialog
+        setIsLoading(false)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create project')
+      setIsLoading(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleCreateProject()
+    } else if (e.key === 'Escape') {
+      handleCancelCreate()
+    }
   }
 
   return (
@@ -42,21 +79,46 @@ export const WelcomeScreen = observer(() => {
           Spatial, hierarchical documentation for your projects
         </Tagline>
 
-        <Actions>
-          <PrimaryButton onClick={handleOpenProject} disabled={isLoading}>
-            {isLoading ? 'Opening...' : 'Open Project'}
-          </PrimaryButton>
-          
-          <SecondaryButton onClick={handleCreateProject} disabled={isLoading}>
-            Create New Project
-          </SecondaryButton>
-        </Actions>
+        {!showCreateForm ? (
+          <Actions>
+            <PrimaryButton onClick={handleOpenProject} disabled={isLoading}>
+              {isLoading ? 'Opening...' : 'Open Project'}
+            </PrimaryButton>
+            
+            <SecondaryButton onClick={handleShowCreateForm} disabled={isLoading}>
+              Create New Project
+            </SecondaryButton>
+          </Actions>
+        ) : (
+          <CreateForm>
+            <FormLabel>Project Name</FormLabel>
+            <FormInput
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="My Awesome Project"
+              autoFocus
+              disabled={isLoading}
+            />
+            <FormActions>
+              <PrimaryButton onClick={handleCreateProject} disabled={isLoading || !projectName.trim()}>
+                {isLoading ? 'Creating...' : 'Create'}
+              </PrimaryButton>
+              <SecondaryButton onClick={handleCancelCreate} disabled={isLoading}>
+                Cancel
+              </SecondaryButton>
+            </FormActions>
+          </CreateForm>
+        )}
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
 
-        <Hint>
-          Open a <code>.board.json</code> file to get started
-        </Hint>
+        {!showCreateForm && (
+          <Hint>
+            Open a <code>.board.json</code> file or create a new project
+          </Hint>
+        )}
       </Content>
 
       <Footer>
@@ -179,6 +241,52 @@ const Hint = styled.p`
     font-family: 'SF Mono', Monaco, monospace;
     font-size: var(--font-size-xs);
   }
+`
+
+const CreateForm = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+  width: 100%;
+  max-width: 320px;
+`
+
+const FormLabel = styled.label`
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+`
+
+const FormInput = styled.input`
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+  
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+  
+  &::placeholder {
+    color: var(--color-text-tertiary);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`
+
+const FormActions = styled.div`
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
 `
 
 const Footer = styled.footer`

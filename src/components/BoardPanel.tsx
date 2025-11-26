@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { styled } from '@linaria/react'
 import { useBoardStore, useDocumentStore, useRootStore } from '../stores/RootStore'
 import { Card } from './Card'
 import { ConnectionLines } from './ConnectionLines'
 import { CreateCardModal } from './CreateCardModal'
+
+const CANVAS_SIZE = 4000
 
 export const BoardPanel = observer(() => {
   const rootStore = useRootStore()
@@ -13,8 +15,21 @@ export const BoardPanel = observer(() => {
   const board = boardStore.currentBoard
   
   const canvasRef = useRef<HTMLDivElement>(null)
+  const scrollerRef = useRef<HTMLDivElement>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createPosition, setCreatePosition] = useState({ x: 0, y: 0 })
+
+  // Center the canvas scroll position on mount
+  useEffect(() => {
+    if (scrollerRef.current) {
+      const scroller = scrollerRef.current
+      // Center the scroll position
+      const centerX = (CANVAS_SIZE - scroller.clientWidth) / 2
+      const centerY = (CANVAS_SIZE - scroller.clientHeight) / 2
+      scroller.scrollLeft = centerX
+      scroller.scrollTop = centerY
+    }
+  }, [])
 
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     // Only handle clicks directly on the canvas, not on cards
@@ -27,8 +42,8 @@ export const BoardPanel = observer(() => {
     if (e.target === canvasRef.current && canvasRef.current) {
       // Get position relative to canvas
       const rect = canvasRef.current.getBoundingClientRect()
-      const scrollLeft = canvasRef.current.parentElement?.scrollLeft || 0
-      const scrollTop = canvasRef.current.parentElement?.scrollTop || 0
+      const scrollLeft = scrollerRef.current?.scrollLeft || 0
+      const scrollTop = scrollerRef.current?.scrollTop || 0
       
       setCreatePosition({
         x: e.clientX - rect.left + scrollLeft,
@@ -45,14 +60,15 @@ export const BoardPanel = observer(() => {
 
   const handleCreateButtonClick = () => {
     // Center of visible viewport
-    const container = canvasRef.current?.parentElement
-    if (container) {
+    const scroller = scrollerRef.current
+    if (scroller) {
       setCreatePosition({
-        x: container.scrollLeft + container.clientWidth / 2 - 150,
-        y: container.scrollTop + container.clientHeight / 2 - 100,
+        x: scroller.scrollLeft + scroller.clientWidth / 2 - 150,
+        y: scroller.scrollTop + scroller.clientHeight / 2 - 100,
       })
     } else {
-      setCreatePosition({ x: 400, y: 300 })
+      // Fallback to canvas center
+      setCreatePosition({ x: CANVAS_SIZE / 2 - 150, y: CANVAS_SIZE / 2 - 100 })
     }
     setShowCreateModal(true)
   }
@@ -68,7 +84,7 @@ export const BoardPanel = observer(() => {
   if (!board || board.cards.length === 0) {
     return (
       <Container>
-        <CanvasScroller>
+        <CanvasScroller ref={scrollerRef}>
           <Canvas ref={canvasRef}>
             <EmptyState>
               <EmptyIcon>✦</EmptyIcon>
@@ -93,7 +109,7 @@ export const BoardPanel = observer(() => {
 
   return (
     <Container>
-      <CanvasScroller>
+      <CanvasScroller ref={scrollerRef}>
         <Canvas 
           ref={canvasRef}
           onClick={handleCanvasClick}

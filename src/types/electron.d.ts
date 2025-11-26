@@ -1,5 +1,6 @@
 export interface ElectronAPI {
   openProject: () => Promise<string | null>
+  createProject: (projectName: string) => Promise<string | null>
   readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
   fileExists: (path: string) => Promise<boolean>

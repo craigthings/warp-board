@@ -67,6 +67,60 @@ ipcMain.handle('project:open', async () => {
   return result.filePaths[0]
 })
 
+// Create new project dialog - save a new .board.json file
+ipcMain.handle('project:create', async (_event, projectName: string) => {
+  const result = await dialog.showSaveDialog(mainWindow!, {
+    title: 'Create New Warp Board Project',
+    defaultPath: `${projectName.toLowerCase().replace(/\s+/g, '-')}.board.json`,
+    filters: [{ name: 'Board Files', extensions: ['board.json'] }],
+  })
+
+  if (result.canceled || !result.filePath) {
+    return null
+  }
+
+  const boardPath = result.filePath
+  // Ensure it ends with .board.json
+  const finalBoardPath = boardPath.endsWith('.board.json') 
+    ? boardPath 
+    : boardPath.replace(/\.json$/, '.board.json').replace(/([^.]+)$/, '$1.board.json')
+
+  // Derive the markdown filename from the board filename
+  const boardFilename = finalBoardPath.split(/[/\\]/).pop() || 'myboard.board.json'
+  const mdFilename = boardFilename.replace('.board.json', '.md')
+  const boardDir = dirname(finalBoardPath)
+  const mdPath = join(boardDir, mdFilename)
+
+  // Create the board JSON
+  const boardContent = {
+    version: '1.0',
+    projectName: projectName,
+    rootMarkdown: mdFilename,
+    defaultCardWidth: 300,
+    defaultCardHeight: 200,
+    cards: []
+  }
+
+  // Create the root markdown file
+  const mdContent = `# ${projectName}
+
+Welcome to your new Warp Board project!
+
+---
+
+Start adding cards to build your spatial documentation.
+`
+
+  try {
+    // Write both files
+    await writeFile(finalBoardPath, JSON.stringify(boardContent, null, 2), 'utf-8')
+    await writeFile(mdPath, mdContent, 'utf-8')
+    return finalBoardPath
+  } catch (error: any) {
+    throw new Error(`Failed to create project: ${error.message}`)
+  }
+})
+
 // Read file contents
 ipcMain.handle('file:read', async (_event, filePath: string) => {
   try {

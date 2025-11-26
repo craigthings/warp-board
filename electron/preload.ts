@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('electronAPI', {
   // Project operations
   openProject: () => ipcRenderer.invoke('project:open'),
+  createProject: (projectName: string) => ipcRenderer.invoke('project:create', projectName),
 
   // File operations
   readFile: (path: string) => ipcRenderer.invoke('file:read', path),
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Type declarations for the renderer
 export interface ElectronAPI {
   openProject: () => Promise<string | null>
+  createProject: (projectName: string) => Promise<string | null>
   readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>
   writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
   fileExists: (path: string) => Promise<boolean>
