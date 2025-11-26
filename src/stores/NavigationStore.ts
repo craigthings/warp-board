@@ -10,8 +10,6 @@ interface NavigationState {
 }
 
 export class NavigationStore {
-  rootStore: RootStore
-  
   currentDocumentPath: string | null = null
   breadcrumb: string[] = []
   slideDirection: SlideDirection = 'none'
@@ -20,10 +18,13 @@ export class NavigationStore {
   // Stack of view states for back navigation
   navigationStack: NavigationState[] = []
 
-  constructor(rootStore: RootStore) {
-    this.rootStore = rootStore
+  constructor(
+    private rootStore: RootStore,
+    private parent: RootStore
+  ) {
     makeAutoObservable(this, {
       rootStore: false,
+      parent: false,
     })
   }
 

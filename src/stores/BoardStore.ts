@@ -30,15 +30,17 @@ export interface Board {
 }
 
 export class BoardStore {
-  rootStore: RootStore
   boards: Map<string, Board> = new Map()
   currentBoardPath: string | null = null
   saveTimeout: NodeJS.Timeout | null = null
 
-  constructor(rootStore: RootStore) {
-    this.rootStore = rootStore
+  constructor(
+    private rootStore: RootStore,
+    private parent: RootStore
+  ) {
     makeAutoObservable(this, {
       rootStore: false,
+      parent: false,
       saveTimeout: false,
     })
   }

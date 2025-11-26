@@ -1,6 +1,7 @@
 {
   "name": "warp-board",
   "version": "0.1.0",
+  "type": "module",
   "description": "A spatial, hierarchical documentation system with markdown boards",
   "main": "dist-electron/main.js",
   "scripts": {

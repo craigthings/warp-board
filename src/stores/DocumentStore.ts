@@ -3,14 +3,16 @@ import type { RootStore } from './RootStore'
 import { parseMarkdown, ParsedDocument } from '../utils/markdownParser'
 
 export class DocumentStore {
-  rootStore: RootStore
   documents: Map<string, ParsedDocument> = new Map()
   loadingPaths: Set<string> = new Set()
 
-  constructor(rootStore: RootStore) {
-    this.rootStore = rootStore
+  constructor(
+    private rootStore: RootStore,
+    private parent: RootStore
+  ) {
     makeAutoObservable(this, {
       rootStore: false,
+      parent: false,
     })
   }
 
