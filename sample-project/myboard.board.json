@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "projectName": "Sample Documentation",
+  "rootMarkdown": "myboard.md",
+  "defaultCardWidth": 300,
+  "defaultCardHeight": 200,
+  "cards": [
+    {
+      "id": "card-001",
+      "markdownPath": "getting-started.md",
+      "x": 100,
+      "y": 100,
+      "width": 300,
+      "height": 200,
+      "connections": [
+        {
+          "targetId": "card-002",
+          "type": "to"
+        }
+      ]
+    },
+    {
+      "id": "card-002",
+      "markdownPath": "architecture.md",
+      "x": 480,
+      "y": 100,
+      "width": 300,
+      "height": 200,
+      "connections": []
+    },
+    {
+      "id": "card-003",
+      "markdownPath": "api-reference.md",
+      "x": 100,
+      "y": 380,
+      "width": 300,
+      "height": 200,
+      "connections": []
+    }
+  ]
+}
+
