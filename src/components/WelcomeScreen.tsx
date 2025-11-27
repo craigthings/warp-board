@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import styled from '@emotion/styled'
 import { useRootStore } from '../stores/RootStore'
+import { getMainAPI } from '../api/mainAPI'
 
 export const WelcomeScreen = observer(() => {
   const rootStore = useRootStore()
@@ -15,7 +16,8 @@ export const WelcomeScreen = observer(() => {
     setError(null)
 
     try {
-      const path = await window.electronAPI.openProject()
+      const api = getMainAPI()
+      const path = await api.openProject()
       if (path) {
         await rootStore.openProject(path)
       }

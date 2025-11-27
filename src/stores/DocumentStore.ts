@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import type { RootStore } from './RootStore'
 import { parseMarkdown, ParsedDocument } from '../utils/markdownParser'
+import { getMainAPI } from '../api/mainAPI'
 
 export class DocumentStore {
   documents: Map<string, ParsedDocument> = new Map()
@@ -36,7 +37,8 @@ export class DocumentStore {
     this.loadingPaths.add(absolutePath)
 
     try {
-      const result = await window.electronAPI.readFile(absolutePath)
+      const api = getMainAPI()
+      const result = await api.readFile(absolutePath)
       
       if (!result.success || !result.content) {
         console.error(`Failed to load document: ${result.error}`)
@@ -62,7 +64,8 @@ export class DocumentStore {
 
   async saveDocument(absolutePath: string, content: string): Promise<boolean> {
     try {
-      const result = await window.electronAPI.writeFile(absolutePath, content)
+      const api = getMainAPI()
+      const result = await api.writeFile(absolutePath, content)
       
       if (!result.success) {
         console.error(`Failed to save document: ${result.error}`)
@@ -86,7 +89,8 @@ export class DocumentStore {
     const content = `# ${title}\n\n---\n\n`
     
     try {
-      const result = await window.electronAPI.writeFile(absolutePath, content)
+      const api = getMainAPI()
+      const result = await api.writeFile(absolutePath, content)
       
       if (!result.success) {
         console.error(`Failed to create document: ${result.error}`)

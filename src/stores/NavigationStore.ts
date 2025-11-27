@@ -1,5 +1,6 @@
 import { makeAutoObservable } from 'mobx'
 import type { RootStore } from './RootStore'
+import { getMainAPI } from '../api/mainAPI'
 
 export type SlideDirection = 'none' | 'left' | 'right'
 
@@ -66,8 +67,9 @@ export class NavigationStore {
     await this.rootStore.documentStore.loadDocument(absolutePath)
     
     // Check if this document has a board
+    const api = getMainAPI()
     const boardPath = absolutePath.replace('.md', '.board.json')
-    const hasBoard = await window.electronAPI.fileExists(boardPath)
+    const hasBoard = await api.exists(boardPath)
     
     if (hasBoard) {
       await this.rootStore.boardStore.loadBoard(boardPath)

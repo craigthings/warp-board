@@ -4,6 +4,7 @@ import { v4 as uuid } from 'uuid'
 import slugify from 'slugify'
 import { promoteDocumentToParent, needsPromotion } from '../utils/documentPromotion'
 import { dirname, join } from '../utils/pathUtils'
+import { getMainAPI } from '../api/mainAPI'
 
 export interface CardConnection {
   targetId: string
@@ -60,7 +61,8 @@ export class BoardStore {
     }
 
     try {
-      const result = await window.electronAPI.readFile(absolutePath)
+      const api = getMainAPI()
+      const result = await api.readFile(absolutePath)
       
       if (!result.success || !result.content) {
         console.error(`Failed to load board: ${result.error}`)
@@ -98,8 +100,9 @@ export class BoardStore {
     if (!board) return false
 
     try {
+      const api = getMainAPI()
       const content = JSON.stringify(board, null, 2)
-      const result = await window.electronAPI.writeFile(absolutePath, content)
+      const result = await api.writeFile(absolutePath, content)
       
       if (!result.success) {
         console.error(`Failed to save board: ${result.error}`)
@@ -189,8 +192,9 @@ export class BoardStore {
     let absolutePath = join(this.rootStore.projectRoot, filePath)
     
     // Handle filename collision
+    const api = getMainAPI()
     let counter = 1
-    while (await window.electronAPI.fileExists(absolutePath)) {
+    while (await api.exists(absolutePath)) {
       filename = `${baseFilename}-${++counter}.md`
       filePath = parentDir ? `${parentDir}/${filename}` : filename
       absolutePath = join(this.rootStore.projectRoot, filePath)
@@ -270,8 +274,9 @@ export class BoardStore {
     
     const boardFiles: string[] = []
     
+    const api = getMainAPI()
     const scanDir = async (dir: string) => {
-      const result = await window.electronAPI.readdir(dir)
+      const result = await api.readdir(dir)
       if (!result.success || !result.items) return
 
       for (const item of result.items) {
@@ -290,10 +295,11 @@ export class BoardStore {
 
   // Update all board files when a markdown path changes
   async updateAllReferences(oldPath: string, newPath: string) {
+    const api = getMainAPI()
     const boardFiles = await this.findAllBoardFiles()
     
     for (const boardFile of boardFiles) {
-      const result = await window.electronAPI.readFile(boardFile)
+      const result = await api.readFile(boardFile)
       if (!result.success || !result.content) continue
 
       let board: Board
@@ -314,7 +320,7 @@ export class BoardStore {
       }
 
       if (modified) {
-        await window.electronAPI.writeFile(boardFile, JSON.stringify(board, null, 2))
+        await api.writeFile(boardFile, JSON.stringify(board, null, 2))
         
         // Update local cache if this board is loaded
         if (this.boards.has(boardFile)) {

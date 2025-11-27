@@ -10,6 +10,7 @@
  */
 
 import { dirname, basename, join } from './pathUtils'
+import { getMainAPI } from '../api/mainAPI'
 
 interface PromotionResult {
   success: boolean
@@ -43,21 +44,23 @@ export async function promoteDocumentToParent(
   const absoluteBoard = join(projectRoot, boardPath)
 
   try {
+    const api = getMainAPI()
+    
     // 3. Check if folder already exists
-    const folderExists = await window.electronAPI.fileExists(absoluteFolder)
+    const folderExists = await api.exists(absoluteFolder)
     if (folderExists) {
       return { success: false, error: `Folder ${folderPath} already exists` }
     }
 
     // 4. Execute atomic operation
     // Create folder
-    const mkdirResult = await window.electronAPI.mkdir(absoluteFolder)
+    const mkdirResult = await api.mkdir(absoluteFolder)
     if (!mkdirResult.success) {
       throw new Error(`Failed to create folder: ${mkdirResult.error}`)
     }
 
     // Move document
-    const renameResult = await window.electronAPI.rename(absoluteOldDoc, absoluteNewDoc)
+    const renameResult = await api.rename(absoluteOldDoc, absoluteNewDoc)
     if (!renameResult.success) {
       // Rollback: remove folder
       await rollback(absoluteFolder, null, null)
@@ -70,7 +73,7 @@ export async function promoteDocumentToParent(
       cards: []
     }, null, 2)
     
-    const writeResult = await window.electronAPI.writeFile(absoluteBoard, boardContent)
+    const writeResult = await api.writeFile(absoluteBoard, boardContent)
     if (!writeResult.success) {
       // Rollback: move file back, remove folder
       await rollback(absoluteFolder, absoluteNewDoc, absoluteOldDoc)
@@ -103,18 +106,20 @@ async function rollback(
   originalFilePath: string | null
 ) {
   try {
+    const api = getMainAPI()
+    
     // Move document back if it was moved
     if (movedFilePath && originalFilePath) {
-      const exists = await window.electronAPI.fileExists(movedFilePath)
+      const exists = await api.exists(movedFilePath)
       if (exists) {
-        await window.electronAPI.rename(movedFilePath, originalFilePath)
+        await api.rename(movedFilePath, originalFilePath)
       }
     }
 
     // Remove folder if it was created
     // Note: This is a simple implementation - in production you'd want
     // to recursively delete the folder
-    const folderExists = await window.electronAPI.fileExists(folderPath)
+    const folderExists = await api.exists(folderPath)
     if (folderExists) {
       // For now, we just log - proper folder deletion would need a new IPC call
       console.warn('Rollback: folder exists but cannot be auto-deleted:', folderPath)
@@ -132,11 +137,12 @@ async function updateAllReferences(
   oldPath: string,
   newPath: string
 ): Promise<number> {
+  const api = getMainAPI()
   const boardFiles = await findAllBoardFiles(projectRoot)
   let updatedCount = 0
 
   for (const boardFile of boardFiles) {
-    const result = await window.electronAPI.readFile(boardFile)
+    const result = await api.readFile(boardFile)
     if (!result.success || !result.content) continue
 
     let board: any
@@ -165,7 +171,7 @@ async function updateAllReferences(
     }
 
     if (modified) {
-      await window.electronAPI.writeFile(boardFile, JSON.stringify(board, null, 2))
+      await api.writeFile(boardFile, JSON.stringify(board, null, 2))
       updatedCount++
     }
   }
@@ -177,9 +183,10 @@ async function updateAllReferences(
  * Recursively finds all .board.json files in the project
  */
 async function findAllBoardFiles(directory: string): Promise<string[]> {
+  const api = getMainAPI()
   const files: string[] = []
   
-  const result = await window.electronAPI.readdir(directory)
+  const result = await api.readdir(directory)
   if (!result.success || !result.items) return files
 
   for (const item of result.items) {
@@ -209,9 +216,10 @@ export async function needsPromotion(
     return false
   }
 
+  const api = getMainAPI()
   const boardPath = documentPath.replace('.md', '.board.json')
   const absoluteBoardPath = join(projectRoot, boardPath)
   
-  return !(await window.electronAPI.fileExists(absoluteBoardPath))
+  return !(await api.exists(absoluteBoardPath))
 }
 

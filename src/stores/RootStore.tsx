@@ -3,6 +3,7 @@ import { makeAutoObservable } from 'mobx'
 import { DocumentStore } from './DocumentStore'
 import { BoardStore } from './BoardStore'
 import { NavigationStore } from './NavigationStore'
+import { getMainAPI } from '../api/mainAPI'
 
 export class RootStore {
   documentStore: DocumentStore
@@ -42,7 +43,8 @@ export class RootStore {
 
   async createProject(projectName: string): Promise<boolean> {
     try {
-      const boardJsonPath = await window.electronAPI.createProject(projectName)
+      const api = getMainAPI()
+      const boardJsonPath = await api.createProject(projectName)
       if (!boardJsonPath) {
         return false // User cancelled
       }

@@ -1,18 +1,28 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-// Expose protected methods to the renderer process
-contextBridge.exposeInMainWorld('electronAPI', {
-  // Project operations
-  openProject: () => ipcRenderer.invoke('project:open'),
-  createProject: (projectName) => ipcRenderer.invoke('project:create', projectName),
+const CHANNEL = 'comlink-rpc'
 
-  // File operations
-  readFile: (path) => ipcRenderer.invoke('file:read', path),
-  writeFile: (path, content) => ipcRenderer.invoke('file:write', path, content),
-  fileExists: (path) => ipcRenderer.invoke('file:exists', path),
-  mkdir: (path) => ipcRenderer.invoke('file:mkdir', path),
-  rename: (oldPath, newPath) => ipcRenderer.invoke('file:rename', oldPath, newPath),
-  readdir: (path) => ipcRenderer.invoke('file:readdir', path),
-  stat: (path) => ipcRenderer.invoke('file:stat', path),
+/**
+ * Expose a Comlink-compatible endpoint to the renderer
+ * This bridges ipcRenderer to Comlink's message-based API
+ */
+contextBridge.exposeInMainWorld('comlinkEndpoint', {
+  postMessage: (message) => {
+    ipcRenderer.send(CHANNEL, message)
+  },
+  addEventListener: (type, listener) => {
+    if (type === 'message') {
+      const handler = (_event, data) => {
+        listener({ data })
+      }
+      // Store handler reference for removal
+      listener._handler = handler
+      ipcRenderer.on(CHANNEL, handler)
+    }
+  },
+  removeEventListener: (type, listener) => {
+    if (type === 'message' && listener._handler) {
+      ipcRenderer.off(CHANNEL, listener._handler)
+    }
+  },
 })
-
