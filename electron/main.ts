@@ -1,14 +1,16 @@
 import { app, BrowserWindow } from 'electron'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { expose } from 'comlink'
-import { createMainEndpoint } from './comlink-adapter'
+import { expose, wrap, type Remote } from 'comlink'
+import { ElectronEndpoint } from './comlink-endpoint'
 import { MainAPI } from './api'
+import type { RendererAPI } from '../src/api/rendererAPI'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 let mainWindow: BrowserWindow | null = null
+let rendererAPI: Remote<RendererAPI> | null = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,9 +27,12 @@ function createWindow() {
     backgroundColor: '#F5F0E8',
   })
 
-  // Create and expose the API via Comlink
-  const api = new MainAPI(() => mainWindow)
-  expose(api, createMainEndpoint(mainWindow))
+  // Expose MainAPI for renderer to call
+  const mainAPI = new MainAPI(() => mainWindow)
+  expose(mainAPI, new ElectronEndpoint(mainWindow, 'main'))
+
+  // Wrap RendererAPI to call from main
+  rendererAPI = wrap<RendererAPI>(new ElectronEndpoint(mainWindow, 'renderer'))
 
   // Load the app
   if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
@@ -39,7 +44,16 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    rendererAPI = null
   })
+}
+
+/**
+ * Get the renderer API proxy
+ * Use this to call methods on the renderer from main
+ */
+export function getRendererAPI(): Remote<RendererAPI> | null {
+  return rendererAPI
 }
 
 app.whenReady().then(createWindow)

@@ -7,6 +7,6 @@
     "allowSyntheticDefaultImports": true,
     "strict": false
   },
-  "include": ["vite.config.ts", "electron"]
+  "include": ["vite.config.ts", "electron", "src/api/rendererAPI.ts", "src/api/types.ts"]
 }
 
