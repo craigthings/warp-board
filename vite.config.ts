@@ -2,16 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron'
 import electronRenderer from 'vite-plugin-electron-renderer'
-import wyw from '@wyw-in-js/vite'
 import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [
-    react(),
-    wyw({
-      include: ['**/*.{ts,tsx}'],
-      babelOptions: {
-        presets: ['@babel/preset-typescript', '@babel/preset-react'],
+    react({
+      jsxImportSource: '@emotion/react',
+      babel: {
+        plugins: ['@emotion/babel-plugin'],
       },
     }),
     electron([
@@ -27,7 +25,7 @@ export default defineConfig({
         },
       },
       {
-        entry: 'electron/preload.ts',
+        entry: 'electron/preload.cjs',
         onstart(options) {
           options.reload()
         },
@@ -35,13 +33,12 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             lib: {
+              entry: 'electron/preload.cjs',
               formats: ['cjs'],
+              fileName: () => 'preload.js',
             },
             rollupOptions: {
               external: ['electron'],
-              output: {
-                format: 'cjs',
-              },
             },
           },
         },
@@ -58,4 +55,3 @@ export default defineConfig({
     outDir: 'dist',
   },
 })
-

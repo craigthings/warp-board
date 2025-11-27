@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { observer } from 'mobx-react-lite'
-import { styled } from '@linaria/react'
+import styled from '@emotion/styled'
 import { useRootStore } from '../stores/RootStore'
 
 export const WelcomeScreen = observer(() => {

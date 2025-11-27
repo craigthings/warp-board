@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { styled } from '@linaria/react'
+import styled from '@emotion/styled'
 
 interface CreateCardModalProps {
   onClose: () => void

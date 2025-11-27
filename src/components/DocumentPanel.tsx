@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react-lite'
-import { styled } from '@linaria/react'
+import styled from '@emotion/styled'
 import { useDocumentStore, useNavigationStore } from '../stores/RootStore'
 import { marked } from 'marked'
 import { useMemo } from 'react'

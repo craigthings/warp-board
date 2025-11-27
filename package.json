@@ -11,32 +11,30 @@
     "electron:dev": "vite --mode electron"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "marked": "^17.0.1",
     "mobx": "^6.12.0",
     "mobx-react-lite": "^4.0.5",
-    "@linaria/core": "^6.2.0",
-    "@linaria/react": "^6.2.1",
-    "marked": "^12.0.0",
-    "uuid": "^9.0.1",
-    "slugify": "^1.6.6"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "slugify": "^1.6.6",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/react": "^18.2.48",
-    "@types/react-dom": "^18.2.18",
-    "@types/uuid": "^9.0.7",
-    "@vitejs/plugin-react": "^4.2.1",
-    "@linaria/vite": "^5.0.4",
-    "@wyw-in-js/vite": "^0.5.0",
-    "@babel/preset-typescript": "^7.23.3",
     "@babel/preset-react": "^7.23.3",
+    "@babel/preset-typescript": "^7.23.3",
+    "@emotion/babel-plugin": "^11.13.5",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "electron": "^39.2.4",
+    "electron-builder": "^26.0.12",
     "typescript": "^5.3.3",
-    "vite": "^5.0.12",
-    "vite-plugin-electron": "^0.28.0",
-    "vite-plugin-electron-renderer": "^0.14.5",
-    "electron": "^28.2.0",
-    "electron-builder": "^24.9.1"
+    "vite": "^7.2.4",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.5"
   },
   "build": {
     "appId": "com.warpboard.app",
@@ -59,4 +57,3 @@
     }
   }
 }
-

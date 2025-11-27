@@ -1,22 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
-
-// Expose protected methods to the renderer process
-contextBridge.exposeInMainWorld('electronAPI', {
-  // Project operations
-  openProject: () => ipcRenderer.invoke('project:open'),
-  createProject: (projectName: string) => ipcRenderer.invoke('project:create', projectName),
-
-  // File operations
-  readFile: (path: string) => ipcRenderer.invoke('file:read', path),
-  writeFile: (path: string, content: string) => ipcRenderer.invoke('file:write', path, content),
-  fileExists: (path: string) => ipcRenderer.invoke('file:exists', path),
-  mkdir: (path: string) => ipcRenderer.invoke('file:mkdir', path),
-  rename: (oldPath: string, newPath: string) => ipcRenderer.invoke('file:rename', oldPath, newPath),
-  readdir: (path: string) => ipcRenderer.invoke('file:readdir', path),
-  stat: (path: string) => ipcRenderer.invoke('file:stat', path),
-})
-
-// Type declarations for the renderer
+// Type declarations for the Electron API
 export interface ElectronAPI {
   openProject: () => Promise<string | null>
   createProject: (projectName: string) => Promise<string | null>
@@ -42,4 +24,6 @@ declare global {
     electronAPI: ElectronAPI
   }
 }
+
+export {}
 

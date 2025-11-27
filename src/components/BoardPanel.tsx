@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
-import { styled } from '@linaria/react'
+import styled from '@emotion/styled'
 import { useBoardStore, useDocumentStore, useRootStore } from '../stores/RootStore'
 import { Card } from './Card'
 import { ConnectionLines } from './ConnectionLines'

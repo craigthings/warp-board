@@ -16,7 +16,7 @@ A spatial, hierarchical documentation system where each markdown document can ha
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 20+ 
 - npm or yarn
 
 ### Installation
@@ -82,12 +82,13 @@ npm run build
 
 ## Tech Stack
 
-- **Electron** - Desktop app framework
-- **React** - UI framework
-- **Vite** - Build tool
+- **Electron 39** - Desktop app framework
+- **React 19** - UI framework
+- **Vite 7** - Build tool
 - **MobX** - State management
-- **Linaria** - CSS-in-JS (zero runtime)
+- **Emotion** - CSS-in-JS
 - **Marked** - Markdown parsing
+- **TypeScript** - Type safety
 
 ## License
 

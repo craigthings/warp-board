@@ -1,5 +1,5 @@
 import { observer } from 'mobx-react-lite'
-import { styled } from '@linaria/react'
+import styled from '@emotion/styled'
 import { useNavigationStore } from '../stores/RootStore'
 
 export const Breadcrumb = observer(() => {
