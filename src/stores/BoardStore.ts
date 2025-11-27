@@ -88,11 +88,27 @@ export class BoardStore {
         this.currentBoardPath = absolutePath
       })
 
+      // Load all card documents
+      this.loadCardDocuments(board)
+
       return board
     } catch (error) {
       console.error('Error loading board:', error)
       return null
     }
+  }
+
+  // Load documents for all cards in a board
+  private loadCardDocuments(board: Board) {
+    if (!this.rootStore.projectRoot) return
+
+    board.cards.forEach(card => {
+      const absolutePath = `${this.rootStore.projectRoot}/${card.markdownPath}`
+      // Only load if not already cached
+      if (!this.rootStore.documentStore.documents.has(absolutePath)) {
+        this.rootStore.documentStore.loadDocument(absolutePath)
+      }
+    })
   }
 
   async saveBoard(absolutePath: string): Promise<boolean> {
