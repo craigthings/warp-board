@@ -1,11 +1,11 @@
-import { makeAutoObservable, runInAction } from 'mobx'
+import { model, Model, prop, modelAction, getRoot } from 'mobx-keystone'
+import { observable, computed } from 'mobx'
 import type { RootStore } from './RootStore'
 import { v4 as uuid } from 'uuid'
 import slugify from 'slugify'
 import { promoteDocumentToParent, needsPromotion } from '../utils/documentPromotion'
 import { dirname, join } from '../utils/pathUtils'
 import { getMainAPI } from '../api/mainAPI'
-import { getRoot } from './storeUtils'
 
 export interface CardConnection {
   targetId: string
@@ -31,33 +31,114 @@ export interface Board {
   cards: Card[]
 }
 
-export class BoardStore {
+@model('warp/BoardStore')
+export class BoardStore extends Model({
+  currentBoardPath: prop<string | null>(null),
+}) {
+  // Transient state (not part of keystone tree)
+  @observable.shallow
   boards: Map<string, Board> = new Map()
-  currentBoardPath: string | null = null
+  
+  // Non-observable, non-keystone
   saveTimeout: NodeJS.Timeout | null = null
 
-  constructor(readonly parent: RootStore) {
-    makeAutoObservable(this, {
-      parent: false,
-      saveTimeout: false,
-    })
-  }
-
   get root(): RootStore {
-    return getRoot(this)
+    return getRoot<RootStore>(this)
   }
 
+  @computed
   get currentBoard(): Board | null {
     if (!this.currentBoardPath) return null
     return this.boards.get(this.currentBoardPath) || null
   }
 
+  @modelAction
+  _setCurrentBoardPath(path: string) {
+    this.currentBoardPath = path
+  }
+
+  @modelAction
+  _cacheBoard(absolutePath: string, board: Board) {
+    this.boards.set(absolutePath, board)
+    this.currentBoardPath = absolutePath
+  }
+
+  @modelAction
+  updateCardPosition(cardId: string, x: number, y: number) {
+    if (!this.currentBoard || !this.currentBoardPath) return
+
+    const card = this.currentBoard.cards.find(c => c.id === cardId)
+    if (card) {
+      card.x = x
+      card.y = y
+      this.scheduleSave(this.currentBoardPath)
+    }
+  }
+
+  @modelAction
+  _addCardToBoard(boardPath: string, card: Card) {
+    const board = this.boards.get(boardPath)
+    if (board) {
+      board.cards.push(card)
+    }
+  }
+
+  @modelAction
+  deleteCard(cardId: string) {
+    if (!this.currentBoard || !this.currentBoardPath) return
+
+    const index = this.currentBoard.cards.findIndex(c => c.id === cardId)
+    if (index !== -1) {
+      this.currentBoard.cards.splice(index, 1)
+      
+      // Remove any connections pointing to this card
+      this.currentBoard.cards.forEach(card => {
+        card.connections = card.connections.filter(c => c.targetId !== cardId)
+      })
+
+      this.scheduleSave(this.currentBoardPath)
+    }
+  }
+
+  @modelAction
+  addConnection(fromCardId: string, toCardId: string, type: CardConnection['type'] = 'to') {
+    if (!this.currentBoard || !this.currentBoardPath) return
+
+    const card = this.currentBoard.cards.find(c => c.id === fromCardId)
+    if (card) {
+      const exists = card.connections.some(c => c.targetId === toCardId)
+      if (!exists) {
+        card.connections.push({ targetId: toCardId, type })
+        this.scheduleSave(this.currentBoardPath)
+      }
+    }
+  }
+
+  @modelAction
+  removeConnection(fromCardId: string, toCardId: string) {
+    if (!this.currentBoard || !this.currentBoardPath) return
+
+    const card = this.currentBoard.cards.find(c => c.id === fromCardId)
+    if (card) {
+      card.connections = card.connections.filter(c => c.targetId !== toCardId)
+      this.scheduleSave(this.currentBoardPath)
+    }
+  }
+
+  // Debounced save - waits 1s after last change
+  scheduleSave(absolutePath: string) {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout)
+    }
+    this.saveTimeout = setTimeout(() => {
+      this.saveBoard(absolutePath)
+    }, 1000)
+  }
+
   async loadBoard(absolutePath: string): Promise<Board | null> {
     // Return cached if available
     if (this.boards.has(absolutePath)) {
-      runInAction(() => {
-        this.currentBoardPath = absolutePath
-      })
+      this._setCurrentBoardPath(absolutePath)
       return this.boards.get(absolutePath)!
     }
 
@@ -84,11 +165,7 @@ export class BoardStore {
         }
       })
 
-      runInAction(() => {
-        this.boards.set(absolutePath, board)
-        this.currentBoardPath = absolutePath
-      })
-
+      this._cacheBoard(absolutePath, board)
       return board
     } catch (error) {
       console.error('Error loading board:', error)
@@ -117,44 +194,20 @@ export class BoardStore {
     }
   }
 
-  // Debounced save - waits 1s after last change
-  scheduleSave(absolutePath: string) {
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout)
-    }
-    this.saveTimeout = setTimeout(() => {
-      this.saveBoard(absolutePath)
-    }, 1000)
-  }
-
-  updateCardPosition(cardId: string, x: number, y: number) {
-    if (!this.currentBoard || !this.currentBoardPath) return
-
-    const card = this.currentBoard.cards.find(c => c.id === cardId)
-    if (card) {
-      card.x = x
-      card.y = y
-      this.scheduleSave(this.currentBoardPath)
-    }
-  }
-
   async createCard(title: string, x: number, y: number): Promise<Card | null> {
     if (!this.currentBoard || !this.currentBoardPath || !this.root.projectRoot) {
       return null
     }
 
-    // Get the current document path (the parent for this new card)
     const currentDocPath = this.root.navigationStore.currentDocumentPath
     let boardPath = this.currentBoardPath
     let parentDir: string
 
-    // Check if the current document needs promotion (first child being added)
     if (currentDocPath) {
       const relativePath = this.root.getRelativePath(currentDocPath)
       const shouldPromote = await needsPromotion(this.root.projectRoot, relativePath)
       
       if (shouldPromote) {
-        // Promote the document
         const result = await promoteDocumentToParent(this.root.projectRoot, relativePath)
         
         if (!result.success) {
@@ -162,37 +215,29 @@ export class BoardStore {
           return null
         }
 
-        // Update navigation and board paths
         const newAbsoluteDocPath = join(this.root.projectRoot, result.newDocPath!)
         const newAbsoluteBoardPath = join(this.root.projectRoot, result.newBoardPath!)
         
-        // Update document store cache
         this.root.documentStore.updatePath(currentDocPath, newAbsoluteDocPath)
         
-        // Load the new board
         await this.loadBoard(newAbsoluteBoardPath)
         boardPath = newAbsoluteBoardPath
         
-        // Update navigation
         this.root.navigationStore.setCurrentDocument(newAbsoluteDocPath)
         
-        // Get parent directory for the new child
         parentDir = dirname(result.newDocPath!)
       } else {
-        // No promotion needed, use the board's directory
         parentDir = dirname(this.root.getRelativePath(boardPath))
       }
     } else {
       parentDir = dirname(this.root.getRelativePath(boardPath))
     }
 
-    // Generate filename from title
     const baseFilename = slugify(title, { lower: true, strict: true })
     let filename = baseFilename + '.md'
     let filePath = parentDir ? `${parentDir}/${filename}` : filename
     let absolutePath = join(this.root.projectRoot, filePath)
     
-    // Handle filename collision
     const api = getMainAPI()
     let counter = 1
     while (await api.exists(absolutePath)) {
@@ -201,11 +246,9 @@ export class BoardStore {
       absolutePath = join(this.root.projectRoot, filePath)
     }
 
-    // Create the markdown file
     const success = await this.root.documentStore.createDocument(absolutePath, title)
     if (!success) return null
 
-    // Create the card
     const card: Card = {
       id: uuid(),
       markdownPath: filePath,
@@ -216,66 +259,18 @@ export class BoardStore {
       connections: [],
     }
 
-    runInAction(() => {
-      const board = this.boards.get(boardPath)
-      if (board) {
-        board.cards.push(card)
-      }
-    })
-
+    this._addCardToBoard(boardPath, card)
     this.scheduleSave(boardPath)
 
     return card
   }
 
-  deleteCard(cardId: string) {
-    if (!this.currentBoard || !this.currentBoardPath) return
-
-    const index = this.currentBoard.cards.findIndex(c => c.id === cardId)
-    if (index !== -1) {
-      // Remove card
-      this.currentBoard.cards.splice(index, 1)
-      
-      // Remove any connections pointing to this card
-      this.currentBoard.cards.forEach(card => {
-        card.connections = card.connections.filter(c => c.targetId !== cardId)
-      })
-
-      this.scheduleSave(this.currentBoardPath)
-    }
-  }
-
-  addConnection(fromCardId: string, toCardId: string, type: CardConnection['type'] = 'to') {
-    if (!this.currentBoard || !this.currentBoardPath) return
-
-    const card = this.currentBoard.cards.find(c => c.id === fromCardId)
-    if (card) {
-      // Check if connection already exists
-      const exists = card.connections.some(c => c.targetId === toCardId)
-      if (!exists) {
-        card.connections.push({ targetId: toCardId, type })
-        this.scheduleSave(this.currentBoardPath)
-      }
-    }
-  }
-
-  removeConnection(fromCardId: string, toCardId: string) {
-    if (!this.currentBoard || !this.currentBoardPath) return
-
-    const card = this.currentBoard.cards.find(c => c.id === fromCardId)
-    if (card) {
-      card.connections = card.connections.filter(c => c.targetId !== toCardId)
-      this.scheduleSave(this.currentBoardPath)
-    }
-  }
-
-  // Find all board.json files in the project
   async findAllBoardFiles(): Promise<string[]> {
     if (!this.root.projectRoot) return []
     
     const boardFiles: string[] = []
-    
     const api = getMainAPI()
+    
     const scanDir = async (dir: string) => {
       const result = await api.readdir(dir)
       if (!result.success || !result.items) return
@@ -294,8 +289,7 @@ export class BoardStore {
     return boardFiles
   }
 
-  // Update all board files when a markdown path changes
-  async updateAllReferences(oldPath: string, newPath: string) {
+  async updateAllReferences(oldPath: string, newPath: string): Promise<void> {
     const api = getMainAPI()
     const boardFiles = await this.findAllBoardFiles()
     
@@ -323,7 +317,6 @@ export class BoardStore {
       if (modified) {
         await api.writeFile(boardFile, JSON.stringify(board, null, 2))
         
-        // Update local cache if this board is loaded
         if (this.boards.has(boardFile)) {
           this.boards.set(boardFile, board)
         }
@@ -331,4 +324,3 @@ export class BoardStore {
     }
   }
 }
-

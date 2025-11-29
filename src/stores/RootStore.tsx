@@ -1,30 +1,55 @@
 import React, { createContext, useContext, ReactNode } from 'react'
-import { makeAutoObservable } from 'mobx'
+import { model, Model, prop, modelAction, registerRootStore } from 'mobx-keystone'
 import { DocumentStore } from './DocumentStore'
 import { BoardStore } from './BoardStore'
 import { NavigationStore } from './NavigationStore'
 import { getMainAPI } from '../api/mainAPI'
-export class RootStore {
-  documentStore: DocumentStore
-  boardStore: BoardStore
-  navigationStore: NavigationStore
+import { UndoManager, undoMiddleware } from './UndoManager'
 
-  // Project state
-  projectRoot: string | null = null
-  isProjectLoaded: boolean = false
+@model('warp/RootStore')
+export class RootStore extends Model({
+  documentStore: prop<DocumentStore>(() => new DocumentStore({})),
+  boardStore: prop<BoardStore>(() => new BoardStore({})),
+  navigationStore: prop<NavigationStore>(() => new NavigationStore({})),
+  projectRoot: prop<string | null>(null),
+  isProjectLoaded: prop<boolean>(false),
+}) {
+  undoManager?: UndoManager
 
-  constructor() {
-    this.documentStore = new DocumentStore(this)
-    this.boardStore = new BoardStore(this)
-    this.navigationStore = new NavigationStore(this)
-    makeAutoObservable(this)
+  onInit() {
+    // Register as root store for lifecycle hooks
+    registerRootStore(this)
+    
+    // Setup undo manager
+    this.undoManager = undoMiddleware(this)
+  }
+
+  @modelAction
+  _setProjectRoot(path: string) {
+    this.projectRoot = path
+  }
+
+  @modelAction
+  _setProjectLoaded(loaded: boolean) {
+    this.isProjectLoaded = loaded
+  }
+
+  getAbsolutePath(relativePath: string): string {
+    if (!this.projectRoot) return relativePath
+    return `${this.projectRoot}/${relativePath}`
+  }
+
+  getRelativePath(absolutePath: string): string {
+    if (!this.projectRoot) return absolutePath
+    const normalizedPath = absolutePath.replace(/\\/g, '/')
+    return normalizedPath.replace(this.projectRoot + '/', '')
   }
 
   async openProject(boardJsonPath: string) {
     // Extract project root from the board.json path
     const pathParts = boardJsonPath.replace(/\\/g, '/').split('/')
-    pathParts.pop() // Remove the filename
-    this.projectRoot = pathParts.join('/')
+    pathParts.pop()
+    this._setProjectRoot(pathParts.join('/'))
 
     // Load the root board
     await this.boardStore.loadBoard(boardJsonPath)
@@ -37,7 +62,7 @@ export class RootStore {
       this.navigationStore.setCurrentDocument(mdPath)
     }
 
-    this.isProjectLoaded = true
+    this._setProjectLoaded(true)
   }
 
   async createProject(projectName: string): Promise<boolean> {
@@ -45,28 +70,15 @@ export class RootStore {
       const api = getMainAPI()
       const boardJsonPath = await api.createProject(projectName)
       if (!boardJsonPath) {
-        return false // User cancelled
+        return false
       }
       
-      // Open the newly created project
       await this.openProject(boardJsonPath)
       return true
     } catch (error) {
       console.error('Failed to create project:', error)
       throw error
     }
-  }
-
-  getAbsolutePath(relativePath: string): string {
-    if (!this.projectRoot) return relativePath
-    return `${this.projectRoot}/${relativePath}`
-  }
-
-  getRelativePath(absolutePath: string): string {
-    if (!this.projectRoot) return absolutePath
-    // Normalize backslashes to forward slashes for consistent comparison
-    const normalizedPath = absolutePath.replace(/\\/g, '/')
-    return normalizedPath.replace(this.projectRoot + '/', '')
   }
 }
 
@@ -75,7 +87,7 @@ const RootStoreContext = createContext<RootStore | null>(null)
 
 // Provider component
 export function RootStoreProvider({ children }: { children: ReactNode }) {
-  const [store] = React.useState(() => new RootStore())
+  const [store] = React.useState(() => new RootStore({}))
   return (
     <RootStoreContext.Provider value={store}>
       {children}
@@ -104,4 +116,3 @@ export function useBoardStore() {
 export function useNavigationStore() {
   return useRootStore().navigationStore
 }
-

@@ -1,21 +1,23 @@
-import { makeAutoObservable, runInAction } from 'mobx'
+import { model, Model, modelAction, getRoot } from 'mobx-keystone'
+import { observable, computed } from 'mobx'
 import type { RootStore } from './RootStore'
 import { parseMarkdown, ParsedDocument } from '../utils/markdownParser'
 import { getMainAPI } from '../api/mainAPI'
-import { getRoot } from './storeUtils'
 
-export class DocumentStore {
+@model('warp/DocumentStore')
+export class DocumentStore extends Model({}) {
+  // Transient state (not part of keystone tree, no undo/redo)
+  @observable.shallow
   documents: Map<string, ParsedDocument> = new Map()
+  
+  @observable
   loadingPaths: Set<string> = new Set()
 
-  constructor(readonly parent: RootStore) {
-    makeAutoObservable(this, { parent: false })
-  }
-
   get root(): RootStore {
-    return getRoot(this)
+    return getRoot<RootStore>(this)
   }
 
+  @computed
   get currentDocument(): ParsedDocument | null {
     const path = this.root.navigationStore.currentDocumentPath
     if (!path) return null
@@ -26,14 +28,44 @@ export class DocumentStore {
     return this.loadingPaths.has(path)
   }
 
+  @modelAction
+  _setDocument(absolutePath: string, doc: ParsedDocument) {
+    this.documents.set(absolutePath, doc)
+    this.loadingPaths.delete(absolutePath)
+  }
+
+  @modelAction
+  _setLoading(absolutePath: string) {
+    this.loadingPaths.add(absolutePath)
+  }
+
+  @modelAction
+  _clearLoading(absolutePath: string) {
+    this.loadingPaths.delete(absolutePath)
+  }
+
+  @modelAction
+  invalidate(absolutePath: string) {
+    this.documents.delete(absolutePath)
+  }
+
+  @modelAction
+  updatePath(oldPath: string, newPath: string) {
+    const doc = this.documents.get(oldPath)
+    if (doc) {
+      doc.path = newPath
+      this.documents.delete(oldPath)
+      this.documents.set(newPath, doc)
+    }
+  }
+
   async loadDocument(absolutePath: string): Promise<ParsedDocument | null> {
     // Return cached if available
     if (this.documents.has(absolutePath)) {
       return this.documents.get(absolutePath)!
     }
 
-    // Mark as loading
-    this.loadingPaths.add(absolutePath)
+    this._setLoading(absolutePath)
 
     try {
       const api = getMainAPI()
@@ -41,22 +73,16 @@ export class DocumentStore {
       
       if (!result.success || !result.content) {
         console.error(`Failed to load document: ${result.error}`)
+        this._clearLoading(absolutePath)
         return null
       }
 
       const parsed = parseMarkdown(result.content, absolutePath)
-
-      runInAction(() => {
-        this.documents.set(absolutePath, parsed)
-        this.loadingPaths.delete(absolutePath)
-      })
-
+      this._setDocument(absolutePath, parsed)
       return parsed
     } catch (error) {
       console.error('Error loading document:', error)
-      runInAction(() => {
-        this.loadingPaths.delete(absolutePath)
-      })
+      this._clearLoading(absolutePath)
       return null
     }
   }
@@ -73,10 +99,7 @@ export class DocumentStore {
 
       // Re-parse and update cache
       const parsed = parseMarkdown(content, absolutePath)
-      runInAction(() => {
-        this.documents.set(absolutePath, parsed)
-      })
-
+      this._setDocument(absolutePath, parsed)
       return true
     } catch (error) {
       console.error('Error saving document:', error)
@@ -98,30 +121,11 @@ export class DocumentStore {
 
       // Parse and cache
       const parsed = parseMarkdown(content, absolutePath)
-      runInAction(() => {
-        this.documents.set(absolutePath, parsed)
-      })
-
+      this._setDocument(absolutePath, parsed)
       return true
     } catch (error) {
       console.error('Error creating document:', error)
       return false
     }
   }
-
-  // Invalidate cache for a document (e.g., after external changes)
-  invalidate(absolutePath: string) {
-    this.documents.delete(absolutePath)
-  }
-
-  // Update path in cache after a file move
-  updatePath(oldPath: string, newPath: string) {
-    const doc = this.documents.get(oldPath)
-    if (doc) {
-      doc.path = newPath
-      this.documents.delete(oldPath)
-      this.documents.set(newPath, doc)
-    }
-  }
 }
-
