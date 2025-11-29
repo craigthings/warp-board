@@ -5,6 +5,7 @@ import slugify from 'slugify'
 import { promoteDocumentToParent, needsPromotion } from '../utils/documentPromotion'
 import { dirname, join } from '../utils/pathUtils'
 import { getMainAPI } from '../api/mainAPI'
+import { getRoot } from './storeUtils'
 
 export interface CardConnection {
   targetId: string
@@ -35,15 +36,15 @@ export class BoardStore {
   currentBoardPath: string | null = null
   saveTimeout: NodeJS.Timeout | null = null
 
-  constructor(
-    private rootStore: RootStore,
-    private parent: RootStore
-  ) {
+  constructor(readonly parent: RootStore) {
     makeAutoObservable(this, {
-      rootStore: false,
       parent: false,
       saveTimeout: false,
     })
+  }
+
+  get root(): RootStore {
+    return getRoot(this)
   }
 
   get currentBoard(): Board | null {
@@ -88,27 +89,11 @@ export class BoardStore {
         this.currentBoardPath = absolutePath
       })
 
-      // Load all card documents
-      this.loadCardDocuments(board)
-
       return board
     } catch (error) {
       console.error('Error loading board:', error)
       return null
     }
-  }
-
-  // Load documents for all cards in a board
-  private loadCardDocuments(board: Board) {
-    if (!this.rootStore.projectRoot) return
-
-    board.cards.forEach(card => {
-      const absolutePath = `${this.rootStore.projectRoot}/${card.markdownPath}`
-      // Only load if not already cached
-      if (!this.rootStore.documentStore.documents.has(absolutePath)) {
-        this.rootStore.documentStore.loadDocument(absolutePath)
-      }
-    })
   }
 
   async saveBoard(absolutePath: string): Promise<boolean> {
@@ -154,23 +139,23 @@ export class BoardStore {
   }
 
   async createCard(title: string, x: number, y: number): Promise<Card | null> {
-    if (!this.currentBoard || !this.currentBoardPath || !this.rootStore.projectRoot) {
+    if (!this.currentBoard || !this.currentBoardPath || !this.root.projectRoot) {
       return null
     }
 
     // Get the current document path (the parent for this new card)
-    const currentDocPath = this.rootStore.navigationStore.currentDocumentPath
+    const currentDocPath = this.root.navigationStore.currentDocumentPath
     let boardPath = this.currentBoardPath
     let parentDir: string
 
     // Check if the current document needs promotion (first child being added)
     if (currentDocPath) {
-      const relativePath = this.rootStore.getRelativePath(currentDocPath)
-      const shouldPromote = await needsPromotion(this.rootStore.projectRoot, relativePath)
+      const relativePath = this.root.getRelativePath(currentDocPath)
+      const shouldPromote = await needsPromotion(this.root.projectRoot, relativePath)
       
       if (shouldPromote) {
         // Promote the document
-        const result = await promoteDocumentToParent(this.rootStore.projectRoot, relativePath)
+        const result = await promoteDocumentToParent(this.root.projectRoot, relativePath)
         
         if (!result.success) {
           console.error('Failed to promote document:', result.error)
@@ -178,34 +163,34 @@ export class BoardStore {
         }
 
         // Update navigation and board paths
-        const newAbsoluteDocPath = join(this.rootStore.projectRoot, result.newDocPath!)
-        const newAbsoluteBoardPath = join(this.rootStore.projectRoot, result.newBoardPath!)
+        const newAbsoluteDocPath = join(this.root.projectRoot, result.newDocPath!)
+        const newAbsoluteBoardPath = join(this.root.projectRoot, result.newBoardPath!)
         
         // Update document store cache
-        this.rootStore.documentStore.updatePath(currentDocPath, newAbsoluteDocPath)
+        this.root.documentStore.updatePath(currentDocPath, newAbsoluteDocPath)
         
         // Load the new board
         await this.loadBoard(newAbsoluteBoardPath)
         boardPath = newAbsoluteBoardPath
         
         // Update navigation
-        this.rootStore.navigationStore.setCurrentDocument(newAbsoluteDocPath)
+        this.root.navigationStore.setCurrentDocument(newAbsoluteDocPath)
         
         // Get parent directory for the new child
         parentDir = dirname(result.newDocPath!)
       } else {
         // No promotion needed, use the board's directory
-        parentDir = dirname(this.rootStore.getRelativePath(boardPath))
+        parentDir = dirname(this.root.getRelativePath(boardPath))
       }
     } else {
-      parentDir = dirname(this.rootStore.getRelativePath(boardPath))
+      parentDir = dirname(this.root.getRelativePath(boardPath))
     }
 
     // Generate filename from title
     const baseFilename = slugify(title, { lower: true, strict: true })
     let filename = baseFilename + '.md'
     let filePath = parentDir ? `${parentDir}/${filename}` : filename
-    let absolutePath = join(this.rootStore.projectRoot, filePath)
+    let absolutePath = join(this.root.projectRoot, filePath)
     
     // Handle filename collision
     const api = getMainAPI()
@@ -213,11 +198,11 @@ export class BoardStore {
     while (await api.exists(absolutePath)) {
       filename = `${baseFilename}-${++counter}.md`
       filePath = parentDir ? `${parentDir}/${filename}` : filename
-      absolutePath = join(this.rootStore.projectRoot, filePath)
+      absolutePath = join(this.root.projectRoot, filePath)
     }
 
     // Create the markdown file
-    const success = await this.rootStore.documentStore.createDocument(absolutePath, title)
+    const success = await this.root.documentStore.createDocument(absolutePath, title)
     if (!success) return null
 
     // Create the card
@@ -286,7 +271,7 @@ export class BoardStore {
 
   // Find all board.json files in the project
   async findAllBoardFiles(): Promise<string[]> {
-    if (!this.rootStore.projectRoot) return []
+    if (!this.root.projectRoot) return []
     
     const boardFiles: string[] = []
     
@@ -305,7 +290,7 @@ export class BoardStore {
       }
     }
 
-    await scanDir(this.rootStore.projectRoot)
+    await scanDir(this.root.projectRoot)
     return boardFiles
   }
 

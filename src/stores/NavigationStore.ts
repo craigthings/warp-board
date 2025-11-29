@@ -1,6 +1,7 @@
 import { makeAutoObservable } from 'mobx'
 import type { RootStore } from './RootStore'
 import { getMainAPI } from '../api/mainAPI'
+import { getRoot } from './storeUtils'
 
 export type SlideDirection = 'none' | 'left' | 'right'
 
@@ -19,22 +20,20 @@ export class NavigationStore {
   // Stack of view states for back navigation
   navigationStack: NavigationState[] = []
 
-  constructor(
-    private rootStore: RootStore,
-    private parent: RootStore
-  ) {
-    makeAutoObservable(this, {
-      rootStore: false,
-      parent: false,
-    })
+  constructor(readonly parent: RootStore) {
+    makeAutoObservable(this, { parent: false })
+  }
+
+  get root(): RootStore {
+    return getRoot(this)
   }
 
   setCurrentDocument(absolutePath: string) {
     this.currentDocumentPath = absolutePath
     
     // Build breadcrumb from path
-    if (this.rootStore.projectRoot) {
-      const relativePath = absolutePath.replace(this.rootStore.projectRoot + '/', '')
+    if (this.root.projectRoot) {
+      const relativePath = absolutePath.replace(this.root.projectRoot + '/', '')
       this.breadcrumb = this.buildBreadcrumb(relativePath)
     }
   }
@@ -47,13 +46,13 @@ export class NavigationStore {
   }
 
   async navigateToCard(markdownPath: string) {
-    if (!this.rootStore.projectRoot) return
+    if (!this.root.projectRoot) return
 
     // Save current state to stack
     if (this.currentDocumentPath) {
       this.navigationStack.push({
         documentPath: this.currentDocumentPath,
-        boardPath: this.rootStore.boardStore.currentBoardPath || '',
+        boardPath: this.root.boardStore.currentBoardPath || '',
         scrollPosition: 0, // TODO: capture actual scroll position
       })
     }
@@ -63,8 +62,8 @@ export class NavigationStore {
     this.isAnimating = true
 
     // Load the new document
-    const absolutePath = this.rootStore.getAbsolutePath(markdownPath)
-    await this.rootStore.documentStore.loadDocument(absolutePath)
+    const absolutePath = this.root.getAbsolutePath(markdownPath)
+    await this.root.documentStore.loadDocument(absolutePath)
     
     // Check if this document has a board
     const api = getMainAPI()
@@ -72,7 +71,7 @@ export class NavigationStore {
     const hasBoard = await api.exists(boardPath)
     
     if (hasBoard) {
-      await this.rootStore.boardStore.loadBoard(boardPath)
+      await this.root.boardStore.loadBoard(boardPath)
     }
 
     this.setCurrentDocument(absolutePath)
@@ -98,8 +97,8 @@ export class NavigationStore {
     const targetState = states[0]
 
     // Load the target state
-    await this.rootStore.documentStore.loadDocument(targetState.documentPath)
-    await this.rootStore.boardStore.loadBoard(targetState.boardPath)
+    await this.root.documentStore.loadDocument(targetState.documentPath)
+    await this.root.boardStore.loadBoard(targetState.boardPath)
     
     this.setCurrentDocument(targetState.documentPath)
   }
@@ -108,12 +107,12 @@ export class NavigationStore {
     // Clear stack and go to root
     this.navigationStack = []
     
-    if (this.rootStore.projectRoot) {
-      const rootBoardPath = this.rootStore.boardStore.currentBoardPath
+    if (this.root.projectRoot) {
+      const rootBoardPath = this.root.boardStore.currentBoardPath
       if (rootBoardPath) {
-        const board = this.rootStore.boardStore.boards.get(rootBoardPath)
+        const board = this.root.boardStore.boards.get(rootBoardPath)
         if (board?.rootMarkdown) {
-          const rootDocPath = this.rootStore.getAbsolutePath(board.rootMarkdown)
+          const rootDocPath = this.root.getAbsolutePath(board.rootMarkdown)
           this.setCurrentDocument(rootDocPath)
         }
       }

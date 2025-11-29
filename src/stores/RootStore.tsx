@@ -4,7 +4,6 @@ import { DocumentStore } from './DocumentStore'
 import { BoardStore } from './BoardStore'
 import { NavigationStore } from './NavigationStore'
 import { getMainAPI } from '../api/mainAPI'
-
 export class RootStore {
   documentStore: DocumentStore
   boardStore: BoardStore
@@ -15,9 +14,9 @@ export class RootStore {
   isProjectLoaded: boolean = false
 
   constructor() {
-    this.documentStore = new DocumentStore(this, this)
-    this.boardStore = new BoardStore(this, this)
-    this.navigationStore = new NavigationStore(this, this)
+    this.documentStore = new DocumentStore(this)
+    this.boardStore = new BoardStore(this)
+    this.navigationStore = new NavigationStore(this)
     makeAutoObservable(this)
   }
 

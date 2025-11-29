@@ -128,7 +128,25 @@ All data fetching, caching, and business logic belongs in MobX stores, not compo
 **Components handle:**
 - Rendering UI based on store state
 - User interactions (clicks, drags, inputs)
-- Local UI state only (hover, animation, form inputs)
+- Local UI state via MobX observable called `state`
+
+```ts
+// ✓ Good: Local observable for component state
+const MyComponent = observer(() => {
+  const [state] = useState(() => observable({
+    isHovered: false,
+    inputValue: '',
+  }))
+  
+  return <div onMouseEnter={() => state.isHovered = true}>...</div>
+})
+
+// ✗ Bad: Multiple useState hooks
+const MyComponent = observer(() => {
+  const [isHovered, setIsHovered] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+})
+```
 
 ```ts
 // ✓ Good: Store handles loading
@@ -150,10 +168,31 @@ const BoardPanel = observer(() => {
 
 ### Store Structure
 
-- **RootStore** - Owns all stores, provides project-level state
+- **RootStore** - Owns all stores, provides project-level state (`parent: null`)
 - **BoardStore** - Board data, card CRUD, connections
 - **DocumentStore** - Markdown content, parsing, caching
 - **NavigationStore** - Navigation stack, breadcrumbs, current view
+
+Parent references are stored in a WeakMap to avoid MobX inheritance issues. Use `setParent` in the constructor and add a `root` getter:
+
+```ts
+import { setParent, getRoot } from './storeUtils'
+
+class BoardStore {
+  constructor(parent: RootStore) {
+    setParent(this, parent)
+    makeAutoObservable(this)
+  }
+  
+  get root(): RootStore {
+    return getRoot(this)
+  }
+  
+  someMethod() {
+    this.root.documentStore.loadDocument(...)
+  }
+}
+```
 
 ## Tech Stack
 

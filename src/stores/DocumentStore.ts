@@ -2,23 +2,22 @@ import { makeAutoObservable, runInAction } from 'mobx'
 import type { RootStore } from './RootStore'
 import { parseMarkdown, ParsedDocument } from '../utils/markdownParser'
 import { getMainAPI } from '../api/mainAPI'
+import { getRoot } from './storeUtils'
 
 export class DocumentStore {
   documents: Map<string, ParsedDocument> = new Map()
   loadingPaths: Set<string> = new Set()
 
-  constructor(
-    private rootStore: RootStore,
-    private parent: RootStore
-  ) {
-    makeAutoObservable(this, {
-      rootStore: false,
-      parent: false,
-    })
+  constructor(readonly parent: RootStore) {
+    makeAutoObservable(this, { parent: false })
+  }
+
+  get root(): RootStore {
+    return getRoot(this)
   }
 
   get currentDocument(): ParsedDocument | null {
-    const path = this.rootStore.navigationStore.currentDocumentPath
+    const path = this.root.navigationStore.currentDocumentPath
     if (!path) return null
     return this.documents.get(path) || null
   }
